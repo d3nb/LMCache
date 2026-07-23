@@ -513,10 +513,13 @@ class TestGdsBackend:
         temp_gds_path: str,
         async_loop: asyncio.AbstractEventLoop,
         allocator=None,
+        extra_config=None,
     ) -> GdsBackend:
         """Return a GdsBackend with tmpfs mocked so GDS is auto-disabled."""
         eff_allocator = allocator or TestGdsBackend._DummyAllocator()
         config = create_test_config(temp_gds_path)
+        if extra_config:
+            config.extra_config.update(extra_config)
         metadata = create_test_metadata()
         with (
             mock.patch(
@@ -611,8 +614,14 @@ class TestGdsBackend:
             backend.close()
 
     def test_batched_get_blocking_no_thread_pool(self, temp_gds_path, async_loop):
-        """batched_get_blocking returns None per missing key when thread pool is off."""
-        backend = self._make_mocked_backend(temp_gds_path, async_loop)
+        """batched_get_blocking returns None per missing key when thread pool is off.
+
+        The pool is on by default since #4067, so it must be disabled
+        explicitly to exercise the no-pool path.
+        """
+        backend = self._make_mocked_backend(
+            temp_gds_path, async_loop, extra_config={"disk_io_threads": 0}
+        )
         try:
             assert not backend.use_thread_pool
             keys = [create_test_key(i) for i in range(3)]
